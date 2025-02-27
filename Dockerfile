@@ -14,7 +14,7 @@ WORKDIR /app
 COPY . /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 EXPOSE 6006
 
 CMD ["python", "/app/booking_details.py"]

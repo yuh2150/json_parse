@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
 llm = llama_cpp.Llama(
-    model_path="models/qwen2.5-1.5b-instructv4-tuningv4-q4_k_m.gguf",
+    model_path="models/qwen2.5-1.5b-instructv6-tuningv6-q4_k_m.gguf",
     # flash_attn=True,
     # chat_format="chatml",
 )
@@ -91,16 +91,15 @@ def worker():
                         { "role": "system",
                             "content": """
 Task: Extract structured booking details from the provided text. Carefully analyze the context to determine each field's value.
-
 Fields to Extract:
     name: The person's name, if mentioned.
-    from: The pickup location. Keywords: (from, pickup location).
-    to: The destination. Keywords: (to, destination, toward, until, arrive, going to, final stop, end location, drop-off point).
+    pickup location: The pickup location 
+    destination location: The destination location
     passengers: The number of passengers. If not mentioned, set to null.
 Extraction Rules:
     If a field is explicitly mentioned, extract its value.
     If a field is missing, set it to null.
-    If only one address is given, determine whether it is a pickup (from) or destination (to) based on context.
+    If only one address is given, determine whether it is a pickup location or destination location based on context.
     Extract passengers separately. If not specified, set passengers to null.
 """
                             },
@@ -124,7 +123,6 @@ Extraction Rules:
                 )
                 
                 response_data= result.get("choices", [{}])[0].get("message", {}).get("content", {})
-                # print(result)
                 response_data = str(response_data)
                 response_data = json.loads(response_data)
                 dimensions = ["time","email","phone-number"]
@@ -144,6 +142,7 @@ Extraction Rules:
                 pickup_location = ""
                 destination_location = ""
                 geoCodingAPI = GeoCodingAPI()
+        
                 geoCoding_pickup = geoCodingAPI.get_geocoding(response_data.get("from"))
                 if geoCoding_pickup["status"] == "OK" :
                     pickup_location= geoCoding_pickup['results'][0]['formatted_address']
@@ -154,11 +153,11 @@ Extraction Rules:
                     destination_location= geoCoding_destination['results'][0]['formatted_address']
                 else:
                     destination_location= ""
-                # print(response_data)
+                print(response_data)
                 response_content = {
                     "name" : response_data.get("name"),
-                    "pickup_location": response_data.get("from"),
-                    "destination_location": response_data.get("to"),
+                    "pickup_location": pickup_location,
+                    "destination_location": destination_location,
                     "passengers": response_data.get("passengers"),
                     "flight_code": flight_code[0] if flight_code and flight_code[0] is not None else None,
                     "email": next((item['value'] for item in extracted if item.get('entity') == 'email'), "null"),
