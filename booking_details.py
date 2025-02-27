@@ -21,6 +21,9 @@ llm = llama_cpp.Llama(
 #     repo_id="yuh0512/SmolLM2-360M-Instruct-tuningv6-Q4_K_M-GGUF"
 #     filename=""
 # )
+pick_up_result = None
+destination_result = None
+
 request_queue = queue.Queue()
 response_dict = {}
 def extract_value(match: Dict[Text, Any]) -> Dict[Text, Any]:
@@ -80,6 +83,7 @@ def getData_for_duckling(text, dims):
         return f"Error: {response.status_code}"
 # Worker to process requests from the queue
 def worker():
+    global pick_up_result, destination_result
     while True:
         request_id, messages = request_queue.get()
         try:
@@ -145,11 +149,13 @@ Extraction Rules:
         
                 geoCoding_pickup = geoCodingAPI.get_geocoding(response_data.get("from"))
                 if geoCoding_pickup["status"] == "OK" :
+                    pick_up_result = geoCoding_pickup
                     pickup_location= geoCoding_pickup['results'][0]['formatted_address']
                 else:
                     pickup_location= ""
                 geoCoding_destination = geoCodingAPI.get_geocoding(response_data.get("to"))
                 if geoCoding_destination["status"] == "OK" :
+                    destination_result = geoCoding_destination
                     destination_location= geoCoding_destination['results'][0]['formatted_address']
                 else:
                     destination_location= ""
@@ -175,6 +181,7 @@ threading.Thread(target=worker, daemon=True).start()
 
 @app.route('/api/booking', methods=['POST'])
 def chat():
+    global pick_up_result, destination_result
     input_data = request.json
     request_id = str(time.time())
     if not input_data or 'messages' not in input_data:
@@ -194,9 +201,15 @@ def chat():
             time.sleep(0.0001)
 
         if response_dict[request_id]["status"] == "done":
-            list_responses.append(response_dict[request_id]["response"])
+            list_responses.append({
+            "response":response_dict[request_id]["response"],
+            "pick_up_result": pick_up_result,
+            "destination_result": destination_result})
+            pick_up_result = None  
+            destination_result = None 
         else:
             list_responses.append({"error": response_dict[request_id]["response"]})
+        
     response = {
         'responses': list_responses
     }
